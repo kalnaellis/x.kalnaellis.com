@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pre-Production Crew Checklist (5)</title>
+  <meta name="description" content="WebGL + GSAP crew pre-production checklist. Meals, allergies, obstacles, safety acknowledgement. Export JSON." />
+
+  <!-- Three.js (WebGL) -->
+  <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
+  <!-- GSAP -->
+  <script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#05060a;
+      --panel:rgba(18,20,28,.72);
+      --panel2:rgba(18,20,28,.52);
+      --stroke:rgba(255,255,255,.12);
+      --text:rgba(255,255,255,.92);
+      --muted:rgba(255,255,255,.62);
+      --warn:rgba(255,180,80,.92);
+      --bad:rgba(255,90,90,.92);
+      --ok:rgba(120,255,170,.9);
+      --shadow: 0 10px 30px rgba(0,0,0,.45);
+      --radius:16px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, -apple-system, system-ui, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+    }
+
+    html,body{height:100%; margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); overflow:hidden;}
+    #stage{position:fixed; inset:0;}
+    canvas{display:block; width:100%; height:100%;}
+
+    /* UI overlay */
+    #ui{
+      position:fixed; inset:0;
+      display:grid;
+      grid-template-columns: 1fr min(560px, 92vw);
+      gap:18px;
+      padding:18px;
+      pointer-events:none; /* enable clicks only on panels */
+    }
+    .panel{
+      pointer-events:auto;
+      background:linear-gradient(180deg, var(--panel), rgba(10,10,15,.55));
+      border:1px solid var(--stroke);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(10px);
+      overflow:hidden;
+    }
+    .left{
+      align-self:end;
+      max-width:520px;
+      padding:16px 16px 14px;
+    }
+    .left h1{
+      margin:0 0 8px;
+      font-size:18px;
+      font-weight:800;
+      letter-spacing:.2px;
+    }
+    .left .sub{
+      margin:0 0 12px;
+      color:var(--muted);
+      line-height:1.35;
+      font-size:13px;
+    }
+    .pillrow{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
+    .pill{
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.06);
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .pill b{color:var(--text); font-weight:700}
+    .meter{
+      margin-top:10px;
+      height:10px; border-radius:999px;
+      background:rgba(255,255,255,.08);
+      border:1px solid var(--stroke);
+      overflow:hidden;
+    }
+    .meter > i{
+      display:block; height:100%;
+      width:0%;
+      background:linear-gradient(90deg, rgba(120,255,170,.18), rgba(120,255,170,.75));
+      box-shadow: 0 0 18px rgba(120,255,170,.35);
+    }
+
+    .right{
+      display:flex;
+      flex-direction:column;
+      min-height: calc(100vh - 36px);
+    }
+    .header{
+      padding:14px 14px 10px;
+      border-bottom:1px solid var(--stroke);
+      background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+    }
+    .header .toprow{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    .brand{
+      display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+    }
+    .brand .tag{
+      font-family:var(--mono);
+      font-size:12px;
+      color:rgba(255,255,255,.7);
+      border:1px solid var(--stroke);
+      padding:4px 8px;
+      border-radius:999px;
+      background:rgba(255,255,255,.05);
+    }
+    .brand h2{
+      margin:0;
+      font-size:15px;
+      letter-spacing:.2px;
+    }
+    .actions{display:flex; gap:8px; flex-wrap:wrap;}
+    button{
+      appearance:none;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      padding:9px 11px;
+      border-radius:12px;
+      font-weight:700;
+      font-size:12px;
+      cursor:pointer;
+      transition:.15s ease;
+      user-select:none;
+    }
+    button:hover{background:rgba(255,255,255,.10);}
+    button.primary{
+      border-color:rgba(120,255,170,.35);
+      background:rgba(120,255,170,.12);
+    }
+    button.danger{
+      border-color:rgba(255,90,90,.35);
+      background:rgba(255,90,90,.10);
+    }
+
+    .tabs{
+      display:flex; gap:8px; flex-wrap:wrap;
+      padding:12px 14px 0;
+    }
+    .tab{
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.05);
+      color:var(--muted);
+      padding:8px 10px;
+      border-radius:999px;
+      font-size:12px;
+      cursor:pointer;
+      transition:.15s ease;
+    }
+    .tab.active{
+      color:var(--text);
+      background:rgba(255,255,255,.10);
+      border-color:rgba(255,255,255,.22);
+    }
+
+    .body{
+      padding:12px 14px 14px;
+      overflow:auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,.18) transparent;
+      flex:1;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    .field{display:flex; flex-direction:column; gap:6px;}
+    label{
+      font-size:12px;
+      color:var(--muted);
+    }
+    input, select, textarea{
+      border:1px solid var(--stroke);
+      background:rgba(0,0,0,.25);
+      color:var(--text);
+      padding:10px 10px;
+      border-radius:12px;
+      outline:none;
+      font-size:13px;
+    }
+    textarea{min-height:82px; resize:vertical;}
+    .full{grid-column:1 / -1;}
+    .hint{
+      margin-top:8px;
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.35;
+    }
+    .callout{
+      margin-top:12px;
+      border:1px solid var(--stroke);
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      padding:10px 10px;
+      border-radius:14px;
+    }
+    .callout b{color:var(--text);}
+    .callout .red{color:var(--bad); font-weight:800;}
+    .callout .green{color:var(--ok); font-weight:800;}
+
+    .checks{
+      display:grid;
+      gap:8px;
+      margin-top:10px;
+    }
+    .check{
+      display:flex; align-items:flex-start; gap:10px;
+      padding:10px;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.04);
+      border-radius:14px;
+    }
+    .check input{margin-top:3px;}
+    .check p{margin:0; font-size:13px; color:var(--muted); line-height:1.35;}
+    .check p b{color:var(--text);}
+
+    .footer{
+      padding:12px 14px 14px;
+      border-top:1px solid var(--stroke);
+      background:linear-gradient(0deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      flex-wrap:wrap;
+    }
+    .status{
+      font-family:var(--mono);
+      font-size:12px;
+      color:rgba(255,255,255,.7);
+    }
+
+    /* Small screens: single column */
+    @media (max-width: 860px){
+      #ui{grid-template-columns: 1fr; }
+      .left{order:2; max-width:none;}
+      .right{min-height:auto;}
+      body{overflow:hidden;}
+    }
+  </style>
+</head>
+
+<body>
+  <div id="stage"></div>
+
+  <div id="ui">
+    <section class="panel left" id="leftPanel">
+      <h1 id="headline">Pre-Production Crew Checklist</h1>
+      <p class="sub" id="subtitle">
+        Five people. One form. Fewer surprises on shoot day.
+        This collects meals, allergies, obstacles, and a basic safety acknowledgement.
+      </p>
+
+      <div class="pillrow">
+        <div class="pill"><b>Autosave:</b> LocalStorage</div>
+        <div class="pill"><b>Export:</b> JSON</div>
+        <div class="pill"><b>Host:</b> GitHub Pages</div>
+      </div>
+
+      <div class="meter" aria-label="completion meter"><i id="meterFill"></i></div>
+
+      <div class="hint" id="dynamicHint">
+        Tip: use tabs to switch crew members. Allergies get flagged in red because food can be a drama queen.
+      </div>
+    </section>
+
+    <section class="panel right" id="rightPanel">
+      <div class="header">
+        <div class="toprow">
+          <div class="brand">
+            <h2>Submission for Shoot</h2>
+            <span class="tag" id="shootTag">SHOOT-READY</span>
+          </div>
+          <div class="actions">
+            <button class="primary" id="exportBtn">Export JSON</button>
+            <button id="copyBtn">Copy Summary</button>
+            <button class="danger" id="resetBtn">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs" id="tabs"></div>
+
+      <div class="body">
+        <form id="form" autocomplete="on">
+          <div class="grid">
+            <div class="field">
+              <label for="name">Name</label>
+              <input id="name" name="name" placeholder="e.g., Camera Op, Gaffer, Reinis, etc." />
+            </div>
+
+            <div class="field">
+              <label for="role">Role</label>
+              <input id="role" name="role" placeholder="e.g., Director, Sound, Makeup" />
+            </div>
+
+            <div class="field">
+              <label for="meal">Meal preference</label>
+              <select id="meal" name="meal">
+                <option value="">Select…</option>
+                <option>Omnivore</option>
+                <option>Vegetarian</option>
+                <option>Vegan</option>
+                <option>Pescatarian</option>
+                <option>Gluten-free</option>
+                <option>Halal</option>
+                <option>Kosher</option>
+                <option>Other / Needs notes</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="allergies">Allergies (food/med)</label>
+              <input id="allergies" name="allergies" placeholder="e.g., nuts, lactose, penicillin (if none, write 'None')" />
+            </div>
+
+            <div class="field full">
+              <label for="obstacles">Special obstacles / constraints</label>
+              <textarea id="obstacles" name="obstacles" placeholder="Access issues, mobility constraints, schedule constraints, sensitivities, anything that could bite us later."></textarea>
+            </div>
+
+            <div class="field">
+              <label for="emergencyName">Emergency contact name</label>
+              <input id="emergencyName" name="emergencyName" placeholder="Full name" />
+            </div>
+
+            <div class="field">
+              <label for="emergencyPhone">Emergency contact phone</label>
+              <input id="emergencyPhone" name="emergencyPhone" inputmode="tel" placeholder="+371 …" />
+            </div>
+
+            <div class="field full">
+              <div class="callout" id="allergyCallout">
+                <b>Allergy status:</b>
+                <span id="allergyStatus" class="green">No issues flagged (yet).</span>
+              </div>
+            </div>
+
+            <div class="field full">
+              <label>Quick safety acknowledgement</label>
+              <div class="checks">
+                <div class="check">
+                  <input type="checkbox" id="s1" name="s1" />
+                  <p><b>Set awareness:</b> I will watch for cables, stands, hot lights, moving gear, and keep walkways clear.</p>
+                </div>
+                <div class="check">
+                  <input type="checkbox" id="s2" name="s2" />
+                  <p><b>Communication:</b> If something feels unsafe, I’ll say it immediately (politely, but immediately).</p>
+                </div>
+                <div class="check">
+                  <input type="checkbox" id="s3" name="s3" />
+                  <p><b>Health basics:</b> I’ll stay hydrated, take breaks when needed, and tell production about any issue that could affect safety.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="hint">
+            Data stays in your browser unless you export it. If you need server-side collection later, welcome to the joy of backend work.
+          </p>
+        </form>
+      </div>
+
+      <div class="footer">
+        <div class="status" id="status">Saved locally.</div>
+        <div class="status" id="completion">Completion: 0%</div>
+      </div>
+    </section>
+  </div>
+
+<script>
+(() => {
+  // ---------------------------
+  // Config
+  // ---------------------------
+  const CREW_SIZE = 5;
+  const STORAGE_KEY = "prepro_crew_checklist_v1";
+  const crew = Array.from({length: CREW_SIZE}, (_, i) => ({
+    id: i,
+    name: "",
+    role: "",
+    meal: "",
+    allergies: "",
+    obstacles: "",
+    emergencyName: "",
+    emergencyPhone: "",
+    s1: false,
+    s2: false,
+    s3: false
+  }));
+
+  // Load from storage if present
+  const saved = safeParse(localStorage.getItem(STORAGE_KEY));
+  if (saved && Array.isArray(saved.crew) && saved.crew.length === CREW_SIZE) {
+    saved.crew.forEach((c, i) => Object.assign(crew[i], c));
+  }
+
+  let activeIndex = 0;
+
+  // ---------------------------
+  // DOM
+  // ---------------------------
+  const tabsEl = document.getElementById("tabs");
+  const formEl = document.getElementById("form");
+  const statusEl = document.getElementById("status");
+  const completionEl = document.getElementById("completion");
+  const meterFill = document.getElementById("meterFill");
+
+  const exportBtn = document.getElementById("exportBtn");
+  const copyBtn = document.getElementById("copyBtn");
+  const resetBtn = document.getElementById("resetBtn");
+
+  const allergyStatus = document.getElementById("allergyStatus");
+  const allergyCallout = document.getElementById("allergyCallout");
+
+  const inputs = {
+    name: document.getElementById("name"),
+    role: document.getElementById("role"),
+    meal: document.getElementById("meal"),
+    allergies: document.getElementById("allergies"),
+    obstacles: document.getElementById("obstacles"),
+    emergencyName: document.getElementById("emergencyName"),
+    emergencyPhone: document.getElementById("emergencyPhone"),
+    s1: document.getElementById("s1"),
+    s2: document.getElementById("s2"),
+    s3: document.getElementById("s3"),
+  };
+
+  // ---------------------------
+  // Tabs
+  // ---------------------------
+  function renderTabs() {
+    tabsEl.innerHTML = "";
+    crew.forEach((c, i) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "tab" + (i === activeIndex ? " active" : "");
+      const label = (c.name && c.name.trim()) ? c.name.trim() : `Crew #${i+1}`;
+      btn.textContent = label;
+      btn.addEventListener("click", () => switchTo(i));
+      tabsEl.appendChild(btn);
+    });
+  }
+
+  function switchTo(i) {
+    persistFromForm(); // save current edits
+    activeIndex = i;
+    renderTabs();
+    populateForm();
+
+    // GSAP micro-drama so it feels “dynamic”
+    gsap.fromTo("#rightPanel", {y: 10, opacity: 0.9}, {y:0, opacity:1, duration:0.25, ease:"power2.out"});
+    gsap.fromTo(".tab.active", {scale:0.96}, {scale:1, duration:0.22, ease:"back.out(2)"});
+    pulse3D(i);
+  }
+
+  // ---------------------------
+  // Form sync
+  // ---------------------------
+  function populateForm() {
+    const c = crew[activeIndex];
+    inputs.name.value = c.name || "";
+    inputs.role.value = c.role || "";
+    inputs.meal.value = c.meal || "";
+    inputs.allergies.value = c.allergies || "";
+    inputs.obstacles.value = c.obstacles || "";
+    inputs.emergencyName.value = c.emergencyName || "";
+    inputs.emergencyPhone.value = c.emergencyPhone || "";
+    inputs.s1.checked = !!c.s1;
+    inputs.s2.checked = !!c.s2;
+    inputs.s3.checked = !!c.s3;
+
+    updateAllergyUI();
+    updateCompletionUI();
+  }
+
+  function persistFromForm() {
+    const c = crew[activeIndex];
+    c.name = inputs.name.value;
+    c.role = inputs.role.value;
+    c.meal = inputs.meal.value;
+    c.allergies = inputs.allergies.value;
+    c.obstacles = inputs.obstacles.value;
+    c.emergencyName = inputs.emergencyName.value;
+    c.emergencyPhone = inputs.emergencyPhone.value;
+    c.s1 = inputs.s1.checked;
+    c.s2 = inputs.s2.checked;
+    c.s3 = inputs.s3.checked;
+    save();
+  }
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      crew
+    }));
+    statusEl.textContent = "Saved locally.";
+    gsap.fromTo(statusEl, {opacity:0.6}, {opacity:1, duration:0.2});
+    renderTabs();
+    updateCompletionUI();
+  }
+
+  // Save on any change
+  formEl.addEventListener("input", () => {
+    persistFromForm();
+    updateAllergyUI();
+    // subtle animated headline hint
+    gsap.fromTo("#dynamicHint", {opacity:0.75}, {opacity:1, duration:0.25});
+    shimmer3D();
+  });
+
+  // ---------------------------
+  // Allergy UI (flag it clearly)
+  // ---------------------------
+  function isAllergyFlagged(text) {
+    const t = (text || "").trim().toLowerCase();
+    if (!t) return false;
+    if (t === "none" || t === "no" || t === "n/a" || t === "na") return false;
+    return true;
+  }
+
+  function updateAllergyUI() {
+    const flagged = isAllergyFlagged(inputs.allergies.value);
+    if (flagged) {
+      allergyStatus.textContent = "Allergies flagged. Don’t ‘oops’ this.";
+      allergyStatus.className = "red";
+      allergyCallout.style.borderColor = "rgba(255,90,90,.35)";
+      allergyCallout.style.background = "linear-gradient(180deg, rgba(255,90,90,.10), rgba(255,255,255,.03))";
+    } else {
+      allergyStatus.textContent = "No issues flagged (yet).";
+      allergyStatus.className = "green";
+      allergyCallout.style.borderColor = "rgba(255,255,255,.12)";
+      allergyCallout.style.background = "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))";
+    }
+  }
+
+  // ---------------------------
+  // Completion metric
+  // ---------------------------
+  const fieldsToCount = ["name","role","meal","allergies","obstacles","emergencyName","emergencyPhone","s1","s2","s3"];
+
+  function scoreCrewMember(c) {
+    let done = 0;
+    for (const f of fieldsToCount) {
+      if (typeof c[f] === "boolean") done += c[f] ? 1 : 0;
+      else done += (String(c[f] || "").trim().length > 0) ? 1 : 0;
+    }
+    return done / fieldsToCount.length;
+  }
+
+  function overallCompletion() {
+    const total = crew.reduce((acc, c) => acc + scoreCrewMember(c), 0);
+    return total / CREW_SIZE;
+  }
+
+  function updateCompletionUI() {
+    const pct = Math.round(overallCompletion() * 100);
+    completionEl.textContent = `Completion: ${pct}%`;
+    meterFill.style.width = `${pct}%`;
+
+    // animate meter smoothly
+    gsap.to(meterFill, {width: `${pct}%`, duration: 0.35, ease:"power2.out"});
+  }
+
+  // ---------------------------
+  // Export / Copy / Reset
+  // ---------------------------
+  exportBtn.addEventListener("click", () => {
+    persistFromForm();
+    const payload = {
+      title: "Pre-Production Crew Checklist",
+      crewSize: CREW_SIZE,
+      exportedAt: new Date().toISOString(),
+      crew: crew.map((c, i) => ({
+        ...c,
+        label: (c.name && c.name.trim()) ? c.name.trim() : `Crew #${i+1}`,
+        allergyFlagged: isAllergyFlagged(c.allergies)
+      }))
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `crew-checklist-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    statusEl.textContent = "Exported JSON.";
+    gsap.fromTo(statusEl, {opacity:0.6}, {opacity:1, duration:0.2});
+  });
+
+  copyBtn.addEventListener("click", async () => {
+    persistFromForm();
+    const lines = crew.map((c, i) => {
+      const label = (c.name && c.name.trim()) ? c.name.trim() : `Crew #${i+1}`;
+      const flag = isAllergyFlagged(c.allergies) ? "⚠️ ALLERGY" : "OK";
+      const meal = c.meal || "(meal?)";
+      return `${label} | ${c.role || "(role?)"} | ${meal} | ${flag} | Obstacles: ${truncate(c.obstacles, 60)}`;
+    });
+    const text = "Crew Checklist Summary\n" + lines.join("\n");
+
+    try{
+      await navigator.clipboard.writeText(text);
+      statusEl.textContent = "Summary copied.";
+    } catch(e){
+      statusEl.textContent = "Copy failed (iOS sometimes acts like iOS).";
+    }
+    gsap.fromTo(statusEl, {opacity:0.6}, {opacity:1, duration:0.2});
+  });
+
+  resetBtn.addEventListener("click", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    for (let i=0;i<CREW_SIZE;i++){
+      Object.assign(crew[i], {
+        name:"", role:"", meal:"", allergies:"", obstacles:"",
+        emergencyName:"", emergencyPhone:"",
+        s1:false, s2:false, s3:false
+      });
+    }
+    activeIndex = 0;
+    renderTabs();
+    populateForm();
+    statusEl.textContent = "Reset complete.";
+    gsap.fromTo(statusEl, {opacity:0.6}, {opacity:1, duration:0.2});
+    reset3D();
+  });
+
+  // ---------------------------
+  // Helpers
+  // ---------------------------
+  function safeParse(s){ try{return JSON.parse(s)} catch {return null} }
+  function truncate(s, n){
+    s = String(s||"").trim();
+    if (!s) return "(none)";
+    return s.length > n ? s.slice(0,n-1) + "…" : s;
+  }
+
+  // ---------------------------
+  // WebGL Scene (Three.js)
+  // A subtle “floating cards” dashboard that reacts to input via GSAP.
+  // ---------------------------
+  const stage = document.getElementById("stage");
+  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200);
+  camera.position.set(0, 1.2, 7);
+
+  // Lights
+  const key = new THREE.DirectionalLight(0xffffff, 1.1);
+  key.position.set(3, 6, 4);
+  scene.add(key);
+
+  const fill = new THREE.PointLight(0x88aaff, 0.55, 30);
+  fill.position.set(-4, 2, 6);
+  scene.add(fill);
+
+  // Background particles (cheap, pretty)
+  const starGeo = new THREE.BufferGeometry();
+  const STAR_COUNT = 700;
+  const starPos = new Float32Array(STAR_COUNT * 3);
+  for (let i=0;i<STAR_COUNT;i++){
+    starPos[i*3+0] = (Math.random()-0.5) * 40;
+    starPos[i*3+1] = (Math.random()-0.5) * 24;
+    starPos[i*3+2] = (Math.random()-0.5) * 40;
+  }
+  starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+  const starMat = new THREE.PointsMaterial({size:0.035, transparent:true, opacity:0.6});
+  const stars = new THREE.Points(starGeo, starMat);
+  scene.add(stars);
+
+  // Floating “crew cards” (5)
+  const cards = [];
+  const cardGroup = new THREE.Group();
+  scene.add(cardGroup);
+
+  function makeCard(label){
+    const geo = new THREE.PlaneGeometry(1.5, 0.95, 1, 1);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x111522,
+      roughness: 0.35,
+      metalness: 0.25,
+      transparent: true,
+      opacity: 0.92
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.label = label;
+    return mesh;
+  }
+
+  for (let i=0;i<CREW_SIZE;i++){
+    const m = makeCard(`Crew ${i+1}`);
+    m.position.set((i-2) * 1.75, 0.2 + (Math.random()*0.2), -0.6 - Math.random()*0.6);
+    m.rotation.set(-0.08, (i-2)*0.08, 0);
+    cardGroup.add(m);
+    cards.push(m);
+  }
+
+  // A subtle “scanner bar”
+  const scanGeo = new THREE.PlaneGeometry(7.2, 0.06);
+  const scanMat = new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.08});
+  const scan = new THREE.Mesh(scanGeo, scanMat);
+  scan.position.set(0, -1.25, 0);
+  scene.add(scan);
+
+  // Animate cards continuously
+  const clock = new THREE.Clock();
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+
+    stars.rotation.y = t * 0.03;
+    stars.rotation.x = t * 0.01;
+
+    cardGroup.rotation.y = Math.sin(t * 0.18) * 0.08;
+    cardGroup.rotation.x = Math.sin(t * 0.12) * 0.04;
+
+    cards.forEach((c, i) => {
+      c.position.y = 0.15 + Math.sin(t*0.9 + i) * 0.12;
+      c.rotation.z = Math.sin(t*0.6 + i) * 0.03;
+      // highlight active
+      c.material.opacity = (i === activeIndex) ? 0.98 : 0.82;
+      c.material.emissive = new THREE.Color(i === activeIndex ? 0x0b1a14 : 0x000000);
+      c.material.emissiveIntensity = (i === activeIndex) ? 0.7 : 0.0;
+    });
+
+    scan.position.x = Math.sin(t*0.9) * 0.6;
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // GSAP reactions on input / tab switch
+  function shimmer3D(){
+    gsap.to(cardGroup.rotation, {y: cardGroup.rotation.y + 0.02, duration:0.2, ease:"power2.out"});
+    gsap.to(scanMat, {opacity: 0.16, duration:0.12, yoyo:true, repeat:1});
+  }
+
+  function pulse3D(i){
+    const target = cards[i];
+    if (!target) return;
+    gsap.fromTo(target.scale, {x:0.96, y:0.96, z:1}, {x:1.06, y:1.06, z:1, duration:0.22, ease:"back.out(2)", yoyo:true, repeat:1});
+  }
+
+  function reset3D(){
+    gsap.to(cardGroup.rotation, {x:0, y:0, z:0, duration:0.35, ease:"power2.out"});
+    cards.forEach((c, i) => gsap.to(c.position, {x:(i-2)*1.75, z:-0.6, duration:0.35, ease:"power2.out"}));
+  }
+
+  // Resize
+  addEventListener("resize", () => {
+    renderer.setSize(innerWidth, innerHeight);
+    camera.aspect = innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+  });
+
+  // ---------------------------
+  // Init
+  // ---------------------------
+  renderTabs();
+  populateForm();
+
+  // Subtle intro motion
+  gsap.fromTo("#leftPanel", {x:-12, opacity:0}, {x:0, opacity:1, duration:0.45, ease:"power2.out"});
+  gsap.fromTo("#rightPanel", {x:12, opacity:0}, {x:0, opacity:1, duration:0.45, ease:"power2.out", delay:0.05});
+})();
+</script>
+</body>
+</html>
